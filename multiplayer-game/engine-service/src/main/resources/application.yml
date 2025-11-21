@@ -1,0 +1,115 @@
+spring:
+  application:
+    name: engine-service
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    
+    # Producer configuration for state updates
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      max-in-flight-requests-per-connection: 5
+      enable-idempotence: true
+      compression-type: snappy
+      properties:
+        spring.json.type.mapping: gameStateUpdate:com.gameengine.engine.model.StateUpdate
+    
+    # Consumer configuration for player events
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:engine-service-group}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.type.mapping: playerEvent:com.gameengine.engine.model.PlayerEvent
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: com.gameengine.engine.model.PlayerEvent
+    
+    # Listener configuration
+    listener:
+      ack-mode: manual_immediate
+      concurrency: 5
+      poll-timeout: 3000
+      type: batch
+    
+    # Topics
+    topics:
+      player-events: player-events
+      game-state-updates: game-state-updates
+      dlq: player-events-dlq
+
+  # Redis configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      jedis:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+          max-wait: 2000ms
+
+# Server configuration
+server:
+  port: ${SERVER_PORT:8081}
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:development}
+
+# Application-specific configuration
+game:
+  engine:
+    # Game world boundaries
+    world:
+      width: 1000.0
+      height: 1000.0
+    
+    # State snapshot interval (milliseconds)
+    snapshot-interval-ms: 10000
+    
+    # Room TTL when empty (seconds)
+    room-ttl-seconds: 300
+    
+    # Maximum events to process per batch
+    max-events-per-batch: 100
+    
+    # Enable state diff updates (vs full state)
+    enable-diff-updates: true
+    
+    # Dead letter queue retry configuration
+    dlq:
+      retry-attempts: 3
+      retry-delay-ms: 1000
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.gameengine.engine: DEBUG
+    org.springframework.kafka: INFO
+    org.springframework.data.redis: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
