@@ -1,11 +1,11 @@
 spring:
   application:
-    name: engine-service
+    name: gateway-service
   
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     
-    # Producer configuration for state updates
+    # Producer configuration for player events
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -15,19 +15,18 @@ spring:
       enable-idempotence: true
       compression-type: snappy
       properties:
-        spring.json.type.mapping: gameStateUpdate:com.gameengine.engine.model.StateUpdate
+        spring.json.type.mapping: playerEvent:com.gameengine.gateway.dto.PlayerActionDTO
     
-    # Consumer configuration for player events
+    # Consumer configuration for game state updates
     consumer:
-      group-id: ${KAFKA_CONSUMER_GROUP_ID:engine-service-group}
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:gateway-service-group}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      auto-offset-reset: earliest
+      auto-offset-reset: latest
       enable-auto-commit: false
       properties:
-        spring.json.type.mapping: playerEvent:com.gameengine.engine.model.PlayerEvent
         spring.json.trusted.packages: "*"
-        spring.json.value.default.type: com.gameengine.engine.model.PlayerEvent
+        spring.json.value.default.type: com.gameengine.gateway.dto.GameStateUpdateDTO
     
     # Listener configuration
     listener:
@@ -40,25 +39,17 @@ spring:
     topics:
       player-events: player-events
       game-state-updates: game-state-updates
-      dlq: player-events-dlq
-
-  # Redis configuration
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      timeout: 2000ms
-      jedis:
-        pool:
-          max-active: 10
-          max-idle: 5
-          min-idle: 2
-          max-wait: 2000ms
 
 # Server configuration
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8080}
+
+# WebSocket configuration
+websocket:
+  endpoint: /ws
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:*}
+  heartbeat-interval: 10000
+  disconnect-timeout: 30000
 
 # Management endpoints
 management:
@@ -78,40 +69,28 @@ management:
       environment: ${ENVIRONMENT:development}
 
 # Application-specific configuration
-game:
-  engine:
-    # Game world boundaries
-    world:
-      width: 1000.0
-      height: 1000.0
-    
-    # State snapshot interval (milliseconds)
-    snapshot-interval-ms: 10000
-    
-    # Room TTL when empty (seconds)
-    room-ttl-seconds: 300
-    
-    # Maximum events to process per batch
-    max-events-per-batch: 100
-    
-    # Enable state diff updates (vs full state)
-    enable-diff-updates: true
-    
-    # Dead letter queue retry configuration
-    dlq:
-      retry-attempts: 3
-      retry-delay-ms: 1000
+gateway:
+  # Maximum concurrent WebSocket connections per room
+  max-connections-per-room: 100
+  
+  # WebSocket message buffer size
+  message-buffer-size: 1024
+  
+  # Enable CORS for REST endpoints
+  cors:
+    enabled: true
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
 
 # Logging
 logging:
   level:
     root: INFO
-    com.gameengine.engine: DEBUG
+    com.gameengine.gateway: DEBUG
     org.springframework.kafka: INFO
-    org.springframework.data.redis: INFO
+    org.springframework.web.socket: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-
 

@@ -175,3 +175,4 @@ The remaining parts of Phase 2 include:
 Ready to proceed with Phase 2, Part 2: Kafka Consumer & Redis Integration
 
 
+
